@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>любовь ит душно</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #121212;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    font-family: system-ui, sans-serif;
+  }
+  #stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #page {
+    max-width: 100vw;
+    max-height: 100vh;
+    max-height: 100dvh;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .zone {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    border: 0;
+    background: none;
+    padding: 0;
+  }
+  #prev { left: 0; width: 35%; cursor: w-resize; }
+  #next { right: 0; width: 65%; cursor: e-resize; }
+  #counter {
+    position: fixed;
+    left: 50%;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    color: #8a8a8a;
+    font-size: 13px;
+    pointer-events: none;
+    text-shadow: 0 0 6px #000;
+  }
+  #empty {
+    display: none;
+    color: #9a9a9a;
+    text-align: center;
+    padding: 24px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <img id="page" alt="" hidden>
+  <div id="empty">Страницы не найдены.<br>Положи картинки в папку <b>pages</b> с именами<br>любовь ит душно_001.jpg, любовь ит душно_002.jpg …</div>
+</div>
+<button class="zone" id="prev" aria-label="Назад"></button>
+<button class="zone" id="next" aria-label="Вперёд"></button>
+<div id="counter"></div>
+
+<script>
+  const NAME = "любовь ит душно_";
+  const FOLDER = "pages/";
+  const EXTS = ["jpg", "png", "jpeg", "webp"];
+
+  const img = document.getElementById("page");
+  const counter = document.getElementById("counter");
+  const empty = document.getElementById("empty");
+
+  const pages = [];
+  let current = 0;
+  let finished = false;
+  let extHint = 0;
+
+  function pad(n) {
+    return String(n).padStart(3, "0");
+  }
+
+  function probe(n) {
+    return new Promise(resolve => {
+      let attempt = 0;
+      const order = EXTS.slice(extHint).concat(EXTS.slice(0, extHint));
+      const tryNext = () => {
+        if (attempt >= order.length) return resolve(null);
+        const ext = order[attempt++];
+        const src = encodeURI(FOLDER + NAME + pad(n) + "." + ext);
+        const probeImg = new Image();
+        probeImg.onload = () => {
+          extHint = EXTS.indexOf(ext);
+          resolve(src);
+        };
+        probeImg.onerror = tryNext;
+        probeImg.src = src;
+      };
+      tryNext();
+    });
+  }
+
+  function show(i) {
+    current = Math.max(0, Math.min(i, pages.length - 1));
+    img.src = pages[current];
+    img.hidden = false;
+    history.replaceState(null, "", "#" + (current + 1));
+    updateCounter();
+    const ahead = pages[current + 1];
+    if (ahead) new Image().src = ahead;
+  }
+
+  function updateCounter() {
+    counter.textContent = (current + 1) + " / " + (finished ? pages.length : pages.length + "+");
+  }
+
+  function next() {
+    if (current < pages.length - 1) show(current + 1);
+  }
+
+  function prev() {
+    if (current > 0) show(current - 1);
+  }
+
+  async function loadRest() {
+    let n = pages.length + 1;
+    while (true) {
+      const src = await probe(n);
+      if (!src) break;
+      pages.push(src);
+      updateCounter();
+      n++;
+    }
+    finished = true;
+    updateCounter();
+  }
+
+  async function init() {
+    const first = await probe(1);
+    if (!first) {
+      empty.style.display = "block";
+      return;
+    }
+    pages.push(first);
+    const wanted = parseInt(location.hash.slice(1), 10);
+    if (wanted > 1) {
+      let n = 2;
+      while (pages.length < wanted) {
+        const src = await probe(n++);
+        if (!src) break;
+        pages.push(src);
+      }
+    }
+    show(Math.min((wanted || 1) - 1, pages.length - 1));
+    loadRest();
+  }
+
+  document.getElementById("next").addEventListener("click", next);
+  document.getElementById("prev").addEventListener("click", prev);
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ") {
+      e.preventDefault();
+      next();
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp") {
+      e.preventDefault();
+      prev();
+    } else if (e.key === "Home") {
+      show(0);
+    } else if (e.key === "End") {
+      show(pages.length - 1);
+    }
+  });
+
+  let startX = 0;
+  let startY = 0;
+  document.addEventListener("touchstart", e => {
+    startX = e.changedTouches[0].clientX;
+    startY = e.changedTouches[0].clientY;
+  }, { passive: true });
+  document.addEventListener("touchend", e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) next(); else prev();
+    }
+  }, { passive: true });
+
+  window.addEventListener("hashchange", () => {
+    const n = parseInt(location.hash.slice(1), 10);
+    if (n >= 1 && n <= pages.length && n - 1 !== current) show(n - 1);
+  });
+
+  init();
+</script>
+</body>
+</html>
