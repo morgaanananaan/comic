@@ -60,7 +60,7 @@
 <body>
 <div id="stage">
   <img id="page" alt="" hidden>
-  <div id="empty">Страницы не найдены.<br>Положи картинки в папку <b>pages</b> с именами<br>1.jpg, 2.jpg, 3.jpg …</div>
+  <div id="empty">Страницы не найдены.<br>Положи картинки в папку <b>pages</b> (или <b>page</b>) с именами<br>1.jpg, 2.jpg, 3.jpg …</div>
 </div>
 <button class="zone" id="prev" aria-label="Назад"></button>
 <button class="zone" id="next" aria-label="Вперёд"></button>
@@ -68,7 +68,8 @@
 
 <script>
   const NAME = "";
-  const FOLDER = "pages/";
+  const FOLDERS = ["pages/", "page/"];
+  let folderHint = 0;
   const EXTS = ["jpg", "png", "jpeg", "webp"];
 
   const img = document.getElementById("page");
@@ -86,15 +87,19 @@
 
   function probe(n) {
     return new Promise(resolve => {
+      const combos = [];
+      const folders = FOLDERS.slice(folderHint).concat(FOLDERS.slice(0, folderHint));
+      const exts = EXTS.slice(extHint).concat(EXTS.slice(0, extHint));
+      folders.forEach(f => exts.forEach(e => combos.push([f, e])));
       let attempt = 0;
-      const order = EXTS.slice(extHint).concat(EXTS.slice(0, extHint));
       const tryNext = () => {
-        if (attempt >= order.length) return resolve(null);
-        const ext = order[attempt++];
-        const src = encodeURI(FOLDER + NAME + pad(n) + "." + ext);
+        if (attempt >= combos.length) return resolve(null);
+        const [folder, ext] = combos[attempt++];
+        const src = encodeURI(folder + NAME + pad(n) + "." + ext);
         const probeImg = new Image();
         probeImg.onload = () => {
           extHint = EXTS.indexOf(ext);
+          folderHint = FOLDERS.indexOf(folder);
           resolve(src);
         };
         probeImg.onerror = tryNext;
